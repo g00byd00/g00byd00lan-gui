@@ -1,9 +1,8 @@
 -- ============================================
--- g00byd0lan GUI - Sky Changer & Effect
+-- g00byd0lan GUI - Sky Changer & Effect (FIXED)
 -- Open/Close: H
 -- Black & Green theme, black text
--- Sky texture: rbxassetid://8408806744 (All 6 sides)
--- Effect texture: rbxassetid://8408806744 (On Character)
+-- Texture: rbxassetid://8408806744
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -27,7 +26,7 @@ local CONFIG = {
 local state = {
     menuOpen = false,
     mainGui = nil,
-    originalSky = nil,
+    skyLoopConnection = nil,
     skyOn = false,
     effectEmitters = {},
     effectConnection = nil,
@@ -35,7 +34,7 @@ local state = {
 }
 
 -- ============================================
--- ЭФФЕКТ G00BY (На персонаже)
+-- ЭФФЕКТ G00BY (Облака вокруг персонажа)
 -- ============================================
 local function removeEffect()
     for _, obj in ipairs(state.effectEmitters) do
@@ -49,43 +48,56 @@ local function createEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    local att = Instance.new("Attachment")
-    att.Name = "G00byEffect_Att"
-    att.Parent = root
+    -- 6 точек вокруг персонажа для полного окружения
+    local offsets = {
+        Vector3.new(0, 0, 0),    -- Центр
+        Vector3.new(3, 0, 0),    -- Право
+        Vector3.new(-3, 0, 0),   -- Лево
+        Vector3.new(0, 3, 0),    -- Верх
+        Vector3.new(0, -3, 0),   -- Низ
+        Vector3.new(0, 0, 3),    -- Перед
+        Vector3.new(0, 0, -3)    -- Зад
+    }
 
-    local emitter = Instance.new("ParticleEmitter")
-    emitter.Name = "G00byEffect"
-    emitter.Texture = CONFIG.textureID -- Применяем текстуру
-    emitter.Rate = 80
-    emitter.Lifetime = NumberRange.new(1, 2.5)
-    emitter.Speed = NumberRange.new(1, 8)
-    emitter.SpreadAngle = Vector2.new(360, 360)
-    
-    emitter.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.2, 2.5),
-        NumberSequenceKeypoint.new(0.8, 2.5),
-        NumberSequenceKeypoint.new(1, 0)
-    })
-    
-    emitter.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(0.1, 0),
-        NumberSequenceKeypoint.new(0.9, 0),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    
-    emitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
-    emitter.LightEmission = 1
-    emitter.LightInfluence = 0
-    emitter.ZOffset = 1
-    emitter.Acceleration = Vector3.new(0, 2, 0)
-    emitter.Rotation = NumberRange.new(0, 360)
-    emitter.RotSpeed = NumberRange.new(-150, 150)
-    emitter.Parent = att
-    
-    table.insert(state.effectEmitters, att)
-    table.insert(state.effectEmitters, emitter)
+    for i, offset in ipairs(offsets) do
+        local att = Instance.new("Attachment")
+        att.Name = "G00byAtt_"..i
+        att.Position = offset
+        att.Parent = root
+        
+        local emitter = Instance.new("ParticleEmitter")
+        emitter.Name = "G00byEffect"
+        emitter.Texture = CONFIG.textureID
+        emitter.Rate = 20
+        emitter.Lifetime = NumberRange.new(1.5, 3)
+        emitter.Speed = NumberRange.new(1, 4)
+        emitter.SpreadAngle = Vector2.new(360, 360)
+        
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.2, 3.5),
+            NumberSequenceKeypoint.new(0.8, 3.5),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.1, 0.3),
+            NumberSequenceKeypoint.new(0.9, 0.3),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        
+        emitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+        emitter.LightEmission = 0.5
+        emitter.LightInfluence = 0
+        emitter.ZOffset = 1
+        emitter.Acceleration = Vector3.new(0, 1, 0)
+        emitter.RotSpeed = NumberRange.new(-50, 50)
+        emitter.Parent = att
+        
+        table.insert(state.effectEmitters, att)
+        table.insert(state.effectEmitters, emitter)
+    end
 end
 
 local function toggleEffect(on)
@@ -108,30 +120,47 @@ local function toggleEffect(on)
 end
 
 -- ============================================
--- ЗАМЕНА НЕБА (Sky на все 6 сторон)
+-- ЗАМЕНА НЕБА (Sky Loop)
 -- ============================================
 local function toggleSky(on)
-    -- Удаляем старые небеса, чтобы игра не перекрывала наше
-    for _, obj in ipairs(Lighting:GetChildren()) do
-        if obj:IsA("Sky") then
-            obj:Destroy()
-        end
+    state.skyOn = on
+    
+    if state.skyLoopConnection then
+        state.skyLoopConnection:Disconnect()
+        state.skyLoopConnection = nil
     end
 
     if on then
-        local sky = Instance.new("Sky")
-        sky.Name = "g00byd0lan_Sky"
-        -- Применяем текстуру на ВСЕ 6 СТОРОН
-        sky.SkyboxBk = CONFIG.textureID -- Задняя
-        sky.SkyboxDn = CONFIG.textureID -- Нижняя
-        sky.SkyboxFt = CONFIG.textureID -- Передняя
-        sky.SkyboxLf = CONFIG.textureID -- Левая
-        sky.SkyboxRt = CONFIG.textureID -- Правая
-        sky.SkyboxUp = CONFIG.textureID -- Верхняя
-        sky.Parent = Lighting
-        state.skyOn = true
+        -- Отключаем атмосферу, чтобы небо было ярким
+        for _, obj in ipairs(Lighting:GetChildren()) do
+            if obj:IsA("Atmosphere") then
+                obj.Density = 0
+            end
+        end
+
+        state.skyLoopConnection = RunService.Heartbeat:Connect(function()
+            if not state.skyOn then return end
+            
+            -- Ищем наше небо
+            local sky = Lighting:FindFirstChild("g00byd0lan_Sky")
+            
+            -- Если игра его удалила или подменила, создаем заново
+            if not sky then
+                sky = Instance.new("Sky")
+                sky.Name = "g00byd0lan_Sky"
+                sky.SkyboxBk = CONFIG.textureID
+                sky.SkyboxDn = CONFIG.textureID
+                sky.SkyboxFt = CONFIG.textureID
+                sky.SkyboxLf = CONFIG.textureID
+                sky.SkyboxRt = CONFIG.textureID
+                sky.SkyboxUp = CONFIG.textureID
+                sky.Parent = Lighting
+            end
+        end)
     else
-        state.skyOn = false
+        -- Удаляем наше небо при выключении
+        local sky = Lighting:FindFirstChild("g00byd0lan_Sky")
+        if sky then sky:Destroy() end
     end
 end
 
