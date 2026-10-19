@@ -1,7 +1,7 @@
 -- ============================================
--- g00byd0lan GUI - TEXTURE VERSION (100% WORK)
+-- g00byd0lan GUI - CUBE SKY & EFFECT (FINAL)
 -- Open/Close: H
--- Texture: rbxassetid://178993746
+-- Texture: rbxassetid://94223128682740
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -14,78 +14,68 @@ local Camera = workspace.CurrentCamera
 
 local CONFIG = {
     menuKey = Enum.KeyCode.H,
-    textureID = "rbxassetid://178993746"
+    textureID = "rbxassetid://94223128682740" -- Твой новый ID
 }
 
 local state = {
     menuOpen = false,
     mainGui = nil,
-    skyModel = nil,
+    skyPart = nil,
     skyConnection = nil,
     effectParts = {},
     effectConnection = nil
 }
 
 -- ============================================
--- НЕБО С КАРТИНКОЙ (Купол вокруг игрока)
+-- SKY (Куб с текстурой вместо неба)
 -- ============================================
 local function toggleSky(on)
-    -- Удаляем старое
-    if state.skyModel then state.skyModel:Destroy() end
+    if state.skyPart then state.skyPart:Destroy() end
     if state.skyConnection then state.skyConnection:Disconnect() end
     
-    -- Восстанавливаем стандартное небо, если выключили
-    local oldSky = Lighting:FindFirstChild("g00by_OldSky")
-    if oldSky then oldSky.Parent = Lighting end
-    
     if on then
-        -- Прячем стандартное небо игры, чтобы оно не перекрывало облака
+        -- Отключаем атмосферу и стандартное небо игры
         for _, obj in ipairs(Lighting:GetChildren()) do
-            if obj:IsA("Sky") then
-                obj.Name = "g00by_OldSky"
-                obj.Parent = nil
-            end
+            if obj:IsA("Sky") then obj.Parent = nil end
+            if obj:IsA("Atmosphere") then obj.Density = 0 end
         end
         
-        state.skyModel = Instance.new("Model")
-        state.skyModel.Name = "G00by_SkyDome"
-        state.skyModel.Parent = workspace
+        -- Создаем куб вместо неба
+        local cube = Instance.new("Part")
+        cube.Name = "G00by_SkyBox"
+        cube.Size = Vector3.new(2000, 2000, 2000)
+        cube.Material = Enum.Material.SmoothPlastic
+        cube.Transparency = 0
+        cube.Anchored = true
+        cube.CanCollide = false
+        cube.CastShadow = false
+        cube.Parent = workspace
+        state.skyPart = cube
 
-        -- Огромная сфера, которая будет нашим небом
-        local sphere = Instance.new("Part")
-        sphere.Shape = Enum.PartType.Ball
-        sphere.Size = Vector3.new(2000, 2000, 2000) 
-        sphere.Material = Enum.Material.SmoothPlastic
-        sphere.Transparency = 0 -- Непрозрачная
-        sphere.CanCollide = false
-        sphere.Anchored = true
-        sphere.Parent = state.skyModel
-
-        -- Натягиваем ТЕКСТУРУ (она покрывает шар полностью)
+        -- Натягиваем текстуру (Texture работает на кубах идеально)
         local texture = Instance.new("Texture")
         texture.Texture = CONFIG.textureID
-        -- Настраиваем текстуру, чтобы она покрывала сферу со всех сторон
-        texture.Face = Enum.NormalId.Back 
-        texture.StudsPerTileU = 500 
-        texture.StudsPerTileV = 500
-        texture.Parent = sphere
+        texture.Face = Enum.NormalId.Back -- Задняя сторона куба, чтобы мы видели картинку изнутри
+        texture.StudsPerTileU = 50 
+        texture.StudsPerTileV = 50
+        texture.Parent = cube
 
-        -- Купол летает за камерой, чтобы ты всегда видел облака
+        -- Куб летает за камерой
         state.skyConnection = RunService.RenderStepped:Connect(function()
-            if sphere and sphere.Parent then
-                sphere.CFrame = CFrame.new(Camera.CFrame.Position)
+            if cube and cube.Parent then
+                cube.CFrame = CFrame.new(Camera.CFrame.Position)
             end
         end)
     else
-        if state.skyModel then
-            state.skyModel:Destroy()
-            state.skyModel = nil
+        if state.skyPart then
+            state.skyPart:Destroy()
+            state.skyPart = nil
         end
     end
 end
 
 -- ============================================
--- ЭФФЕКТ G00BY НА ПЕРСОНАЖЕ
+-- ЭФФЕКТ G00BY (Кубы вокруг персонажа)
 -- ============================================
 local function removeEffect()
     for _, part in ipairs(state.effectParts) do
@@ -99,42 +89,37 @@ local function createEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- Точки вокруг персонажа
     local offsets = {
-        Vector3.new(0, 3, 0),    -- Сверху
-        Vector3.new(0, -2, 0),   -- Снизу
-        Vector3.new(2.5, 0, 0),  -- Справа
-        Vector3.new(-2.5, 0, 0), -- Слева
-        Vector3.new(0, 0, 2.5),  -- Спереди
-        Vector3.new(0, 0, -2.5)  -- Сзади
+        Vector3.new(0, 3, 0), Vector3.new(0, -3, 0),
+        Vector3.new(3, 0, 0), Vector3.new(-3, 0, 0),
+        Vector3.new(0, 0, 3), Vector3.new(0, 0, -3)
     }
 
     for _, offset in ipairs(offsets) do
-        local sphere = Instance.new("Part")
-        sphere.Shape = Enum.PartType.Ball
-        sphere.Size = Vector3.new(3, 3, 3)
-        sphere.Material = Enum.Material.SmoothPlastic
-        sphere.CanCollide = false
-        sphere.Massless = true
-        sphere.Anchored = false
-        sphere.CFrame = root.CFrame * CFrame.new(offset)
-        sphere.Parent = character
+        -- Используем Block (куб), чтобы текстура ложилась ровно
+        local block = Instance.new("Part")
+        block.Shape = Enum.PartType.Block
+        block.Size = Vector3.new(3, 3, 0.2) 
+        block.Material = Enum.Material.SmoothPlastic
+        block.CanCollide = false
+        block.Massless = true
+        block.Anchored = false
+        block.CFrame = root.CFrame * CFrame.new(offset)
+        block.Parent = character
         
-        -- Используем Texture вместо Decal (оборачивает шар со всех сторон)
         local texture = Instance.new("Texture")
         texture.Texture = CONFIG.textureID
-        texture.Face = Enum.NormalId.Back
+        texture.Face = Enum.NormalId.Front
         texture.StudsPerTileU = 3
         texture.StudsPerTileV = 3
-        texture.Parent = sphere
+        texture.Parent = block
         
-        -- Крепим к персонажу
         local weld = Instance.new("WeldConstraint")
         weld.Part0 = root
-        weld.Part1 = sphere
-        weld.Parent = sphere
+        weld.Part1 = block
+        weld.Parent = block
         
-        table.insert(state.effectParts, sphere)
+        table.insert(state.effectParts, block)
     end
 end
 
