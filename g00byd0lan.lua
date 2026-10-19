@@ -1,7 +1,6 @@
 -- ============================================
--- g00byd0lan GUI - Sky Changer & Effect (FIXED)
+-- g00byd0lan GUI - Sky Changer & Effect (FIXED 2.0)
 -- Open/Close: H
--- Texture ID: rbxassetid://178993746
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -18,27 +17,26 @@ local CONFIG = {
     bgColor = Color3.fromRGB(0, 0, 0),
     accentColor = Color3.fromRGB(0, 255, 0),
     textColor = Color3.fromRGB(0, 0, 0),
-    textureID = "rbxassetid://178993746" -- Твоя текстура
+    textureID = "rbxassetid://178993746"
 }
 
 local state = {
     menuOpen = false,
     mainGui = nil,
-    skyLoopConnection = nil,
-    skyOn = false,
-    effectEmitters = {},
+    skyLoop = nil,
+    effectObjects = {},
     effectConnection = nil,
     effectOn = false
 }
 
 -- ============================================
--- ЭФФЕКТ G00BY (На персонаже со всех сторон)
+-- ЭФФЕКТ G00BY (Картинки вокруг персонажа)
 -- ============================================
 local function removeEffect()
-    for _, obj in ipairs(state.effectEmitters) do
+    for _, obj in ipairs(state.effectObjects) do
         if obj and obj.Parent then obj:Destroy() end
     end
-    state.effectEmitters = {}
+    state.effectObjects = {}
 end
 
 local function createEffect(character)
@@ -46,51 +44,37 @@ local function createEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- 7 точек (Центр, Право, Лево, Верх, Низ, Перед, Зад)
     local offsets = {
-        Vector3.new(0, 0, 0),
-        Vector3.new(3, 0, 0), Vector3.new(-3, 0, 0),
         Vector3.new(0, 3, 0), Vector3.new(0, -3, 0),
+        Vector3.new(3, 0, 0), Vector3.new(-3, 0, 0),
         Vector3.new(0, 0, 3), Vector3.new(0, 0, -3)
     }
 
     for i, offset in ipairs(offsets) do
-        local att = Instance.new("Attachment")
-        att.Name = "G00byAtt_"..i
-        att.Position = offset
-        att.Parent = root
+        -- Создаем невидимую плашку (Part)
+        local part = Instance.new("Part")
+        part.Name = "G00byEffectPart"
+        part.Size = Vector3.new(4, 4, 0.1)
+        part.Transparency = 1
+        part.Anchored = false
+        part.CanCollide = false
+        part.Massless = true
+        part.CFrame = root.CFrame * CFrame.new(offset)
+        part.Parent = character
         
-        local emitter = Instance.new("ParticleEmitter")
-        emitter.Name = "G00byEffect"
-        emitter.Texture = CONFIG.textureID
-        emitter.Rate = 40 -- Много частиц
-        emitter.Lifetime = NumberRange.new(1, 2)
-        emitter.Speed = NumberRange.new(2, 5)
-        emitter.SpreadAngle = Vector2.new(360, 360)
+        -- Прикрепляем картинку (Decal) к этой плашке
+        local decal = Instance.new("Decal")
+        decal.Texture = CONFIG.textureID
+        decal.Face = Enum.NormalId.Front
+        decal.Parent = part
         
-        emitter.Size = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.1, 5), -- Большой размер
-            NumberSequenceKeypoint.new(0.9, 5),
-            NumberSequenceKeypoint.new(1, 0)
-        })
+        -- Привязываем плашку к персонажу с помощью Weld
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = root
+        weld.Part1 = part
+        weld.Parent = part
         
-        emitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.1, 0.2), -- Хорошо видно
-            NumberSequenceKeypoint.new(0.9, 0.2),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        
-        emitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
-        emitter.LightEmission = 1
-        emitter.ZOffset = 1
-        emitter.Acceleration = Vector3.new(0, 1, 0)
-        emitter.RotSpeed = NumberRange.new(-50, 50)
-        emitter.Parent = att
-        
-        table.insert(state.effectEmitters, att)
-        table.insert(state.effectEmitters, emitter)
+        table.insert(state.effectObjects, part)
     end
 end
 
@@ -113,31 +97,28 @@ local function toggleEffect(on)
 end
 
 -- ============================================
--- SKY (Принудительно на все 6 сторон)
+-- SKY (Жесткая смена неба)
 -- ============================================
 local function toggleSky(on)
-    state.skyOn = on
-    
-    if state.skyLoopConnection then
-        state.skyLoopConnection:Disconnect()
-        state.skyLoopConnection = nil
+    if state.skyLoop then
+        state.skyLoop:Disconnect()
+        state.skyLoop = nil
     end
 
     if on then
-        -- Убираем туман, чтобы небо было видно
-        for _, obj in ipairs(Lighting:GetChildren()) do
-            if obj:IsA("Atmosphere") then obj.Density = 0 end
-        end
-
-        -- Каждый кадр проверяем, не сбросила ли игра небо
-        state.skyLoopConnection = RunService.Heartbeat:Connect(function()
-            if not state.skyOn then return end
+        state.skyLoop = RunService.Heartbeat:Connect(function()
+            -- Убиваем туман и эффекты, чтобы небо было видно
+            for _, obj in ipairs(Lighting:GetChildren()) do
+                if obj:IsA("Atmosphere") or obj:IsA("Sky") then
+                    if obj.Name ~= "CustomSky" then obj:Destroy() end
+                end
+            end
             
-            local sky = Lighting:FindFirstChild("g00byd0lan_Sky")
-            if not sky then
-                sky = Instance.new("Sky")
-                sky.Name = "g00byd0lan_Sky"
-                -- ЖЕСТКО СТАВИМ ТЕКСТУРУ НА ВСЕ СТОРОНЫ
+            -- Создаем наше небо
+            if not Lighting:FindFirstChild("CustomSky") then
+                local sky = Instance.new("Sky")
+                sky.Name = "CustomSky"
+                -- Ставим картинку на все 6 сторон
                 sky.SkyboxBk = CONFIG.textureID
                 sky.SkyboxDn = CONFIG.textureID
                 sky.SkyboxFt = CONFIG.textureID
@@ -148,13 +129,13 @@ local function toggleSky(on)
             end
         end)
     else
-        local sky = Lighting:FindFirstChild("g00byd0lan_Sky")
+        local sky = Lighting:FindFirstChild("CustomSky")
         if sky then sky:Destroy() end
     end
 end
 
 -- ============================================
--- DRAG (Перетаскивание)
+-- DRAG
 -- ============================================
 local function makeDraggable(frame, dragPart)
     local dragging, dragStart, startPos = false, nil, nil
@@ -173,9 +154,7 @@ local function makeDraggable(frame, dragPart)
             local delta = input.Position - dragStart
             local viewport = Camera.ViewportSize
             local frameSize = frame.AbsoluteSize
-            local newX = math.clamp(startPos.X.Offset + delta.X, 0, viewport.X - frameSize.X)
-            local newY = math.clamp(startPos.Y.Offset + delta.Y, 0, viewport.Y - frameSize.Y)
-            frame.Position = UDim2.new(0, newX, 0, newY)
+            frame.Position = UDim2.new(0, math.clamp(startPos.X.Offset + delta.X, 0, viewport.X - frameSize.X), 0, math.clamp(startPos.Y.Offset + delta.Y, 0, viewport.Y - frameSize.Y))
         end
     end)
 end
@@ -190,35 +169,32 @@ local function createGUI()
     state.mainGui.Name = "g00byd0lan"
     state.mainGui.ResetOnSpawn = false
     state.mainGui.IgnoreGuiInset = true
-    state.mainGui.DisplayOrder = 999
     state.mainGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     
     local mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainFrame"
     mainFrame.Size = UDim2.new(0, 0, 0, 0)
     mainFrame.Position = UDim2.new(0.5, -150, 0.5, -150)
     mainFrame.BackgroundColor3 = CONFIG.bgColor
     mainFrame.BackgroundTransparency = 0.1
     mainFrame.BorderSizePixel = 0
-    mainFrame.Active = true
     mainFrame.ClipsDescendants = true
     mainFrame.Parent = state.mainGui
     
     local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 12); corner.Parent = mainFrame
-    local stroke = Instance.new("UIStroke"); stroke.Color = CONFIG.accentColor; stroke.Thickness = 2; stroke.Transparency = 0.3; stroke.Parent = mainFrame
+    local stroke = Instance.new("UIStroke"); stroke.Color = CONFIG.accentColor; stroke.Thickness = 2; stroke.Parent = mainFrame
     
     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CONFIG.guiSize }):Play()
     
+    -- Заголовок
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 40)
     titleBar.BackgroundColor3 = CONFIG.bgColor
     titleBar.BackgroundTransparency = 0.3
-    titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local tCorner = Instance.new("UICorner"); tCorner.CornerRadius = UDim.new(0, 12); tCorner.Parent = titleBar
     
     local titleText = Instance.new("TextLabel")
-    titleText.Size = UDim2.new(1, -80, 1, 0)
+    titleText.Size = UDim2.new(1, -40, 1, 0)
     titleText.Position = UDim2.new(0, 10, 0, 0)
     titleText.BackgroundTransparency = 1
     titleText.Text = "g00byd0lan GUI"
@@ -228,6 +204,7 @@ local function createGUI()
     titleText.TextXAlignment = Enum.TextXAlignment.Left
     titleText.Parent = titleBar
     
+    -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 24, 0, 24)
     closeBtn.Position = UDim2.new(1, -32, 0.5, -12)
@@ -241,9 +218,7 @@ local function createGUI()
     local cCorner = Instance.new("UICorner"); cCorner.CornerRadius = UDim.new(0, 6); cCorner.Parent = closeBtn
     
     closeBtn.MouseButton1Click:Connect(function()
-        local t = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)
-        })
+        local t = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0) })
         t:Play()
         t.Completed:Connect(function()
             state.mainGui.Enabled = false
@@ -264,6 +239,7 @@ local function createGUI()
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.Parent = content
     
+    -- Кнопка Sky
     local skyBtn = Instance.new("TextButton")
     skyBtn.Size = UDim2.new(1, 0, 0, 40)
     skyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -278,15 +254,11 @@ local function createGUI()
     local skyActive = false
     skyBtn.MouseButton1Click:Connect(function()
         skyActive = not skyActive
-        if skyActive then
-            skyBtn.BackgroundColor3 = CONFIG.accentColor
-            toggleSky(true)
-        else
-            skyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            toggleSky(false)
-        end
+        skyBtn.BackgroundColor3 = skyActive and CONFIG.accentColor or Color3.fromRGB(50, 50, 50)
+        toggleSky(skyActive)
     end)
     
+    -- Кнопка Effect
     local effectBtn = Instance.new("TextButton")
     effectBtn.Size = UDim2.new(1, 0, 0, 40)
     effectBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -301,13 +273,8 @@ local function createGUI()
     local effectActive = false
     effectBtn.MouseButton1Click:Connect(function()
         effectActive = not effectActive
-        if effectActive then
-            effectBtn.BackgroundColor3 = CONFIG.accentColor
-            toggleEffect(true)
-        else
-            effectBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            toggleEffect(false)
-        end
+        effectBtn.BackgroundColor3 = effectActive and CONFIG.accentColor or Color3.fromRGB(50, 50, 50)
+        toggleEffect(effectActive)
     end)
     
     makeDraggable(mainFrame, titleBar)
@@ -330,7 +297,5 @@ UserInputService.InputBegan:Connect(function(input, gp)
         toggleMenu()
     end
 end)
-
-print("[g00byd0lan GUI] Loaded. Press H to open menu.")
 
 print("[g00byd0lan GUI] Loaded. Press H to open menu.")
