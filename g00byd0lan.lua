@@ -1,8 +1,7 @@
 -- ============================================
--- g00byd0lan GUI - Sky Changer & Effect
+-- g00byd0lan GUI - Sky Changer & Effect (FIXED)
 -- Open/Close: H
--- Black & Green theme, black text
--- Texture: rbxassetid://178993746
+-- Texture ID: rbxassetid://178993746
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -13,14 +12,13 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Конфигурация
 local CONFIG = {
     menuKey = Enum.KeyCode.H,
     guiSize = UDim2.new(0, 300, 0, 300),
     bgColor = Color3.fromRGB(0, 0, 0),
     accentColor = Color3.fromRGB(0, 255, 0),
     textColor = Color3.fromRGB(0, 0, 0),
-    textureID = "rbxassetid://178993746" -- Новая текстура
+    textureID = "rbxassetid://178993746" -- Твоя текстура
 }
 
 local state = {
@@ -34,7 +32,7 @@ local state = {
 }
 
 -- ============================================
--- ЭФФЕКТ G00BY (Облака вокруг персонажа)
+-- ЭФФЕКТ G00BY (На персонаже со всех сторон)
 -- ============================================
 local function removeEffect()
     for _, obj in ipairs(state.effectEmitters) do
@@ -48,15 +46,12 @@ local function createEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- 7 точек вокруг персонажа для полного окружения
+    -- 7 точек (Центр, Право, Лево, Верх, Низ, Перед, Зад)
     local offsets = {
-        Vector3.new(0, 0, 0),    -- Центр
-        Vector3.new(3, 0, 0),    -- Право
-        Vector3.new(-3, 0, 0),   -- Лево
-        Vector3.new(0, 3, 0),    -- Верх
-        Vector3.new(0, -3, 0),   -- Низ
-        Vector3.new(0, 0, 3),    -- Перед
-        Vector3.new(0, 0, -3)    -- Зад
+        Vector3.new(0, 0, 0),
+        Vector3.new(3, 0, 0), Vector3.new(-3, 0, 0),
+        Vector3.new(0, 3, 0), Vector3.new(0, -3, 0),
+        Vector3.new(0, 0, 3), Vector3.new(0, 0, -3)
     }
 
     for i, offset in ipairs(offsets) do
@@ -68,28 +63,27 @@ local function createEffect(character)
         local emitter = Instance.new("ParticleEmitter")
         emitter.Name = "G00byEffect"
         emitter.Texture = CONFIG.textureID
-        emitter.Rate = 25
-        emitter.Lifetime = NumberRange.new(1.5, 3)
-        emitter.Speed = NumberRange.new(1, 4)
+        emitter.Rate = 40 -- Много частиц
+        emitter.Lifetime = NumberRange.new(1, 2)
+        emitter.Speed = NumberRange.new(2, 5)
         emitter.SpreadAngle = Vector2.new(360, 360)
         
         emitter.Size = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.2, 4),
-            NumberSequenceKeypoint.new(0.8, 4),
+            NumberSequenceKeypoint.new(0.1, 5), -- Большой размер
+            NumberSequenceKeypoint.new(0.9, 5),
             NumberSequenceKeypoint.new(1, 0)
         })
         
         emitter.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.1, 0.2),
+            NumberSequenceKeypoint.new(0.1, 0.2), -- Хорошо видно
             NumberSequenceKeypoint.new(0.9, 0.2),
             NumberSequenceKeypoint.new(1, 1)
         })
         
         emitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
-        emitter.LightEmission = 0.5
-        emitter.LightInfluence = 0
+        emitter.LightEmission = 1
         emitter.ZOffset = 1
         emitter.Acceleration = Vector3.new(0, 1, 0)
         emitter.RotSpeed = NumberRange.new(-50, 50)
@@ -103,8 +97,7 @@ end
 local function toggleEffect(on)
     state.effectOn = on
     if on then
-        local ch = LocalPlayer.Character
-        if ch then createEffect(ch) end
+        if LocalPlayer.Character then createEffect(LocalPlayer.Character) end
         if state.effectConnection then state.effectConnection:Disconnect() end
         state.effectConnection = LocalPlayer.CharacterAdded:Connect(function(character)
             task.wait(1)
@@ -120,7 +113,7 @@ local function toggleEffect(on)
 end
 
 -- ============================================
--- ЗАМЕНА НЕБА (Sky Loop)
+-- SKY (Принудительно на все 6 сторон)
 -- ============================================
 local function toggleSky(on)
     state.skyOn = on
@@ -131,23 +124,20 @@ local function toggleSky(on)
     end
 
     if on then
-        -- Отключаем атмосферу, чтобы небо было ярким
+        -- Убираем туман, чтобы небо было видно
         for _, obj in ipairs(Lighting:GetChildren()) do
-            if obj:IsA("Atmosphere") then
-                obj.Density = 0
-            end
+            if obj:IsA("Atmosphere") then obj.Density = 0 end
         end
 
+        -- Каждый кадр проверяем, не сбросила ли игра небо
         state.skyLoopConnection = RunService.Heartbeat:Connect(function()
             if not state.skyOn then return end
             
-            -- Ищем наше небо
             local sky = Lighting:FindFirstChild("g00byd0lan_Sky")
-            
-            -- Если игра его удалила или подменила, создаем заново
             if not sky then
                 sky = Instance.new("Sky")
                 sky.Name = "g00byd0lan_Sky"
+                -- ЖЕСТКО СТАВИМ ТЕКСТУРУ НА ВСЕ СТОРОНЫ
                 sky.SkyboxBk = CONFIG.textureID
                 sky.SkyboxDn = CONFIG.textureID
                 sky.SkyboxFt = CONFIG.textureID
@@ -158,34 +148,28 @@ local function toggleSky(on)
             end
         end)
     else
-        -- Удаляем наше небо при выключении
         local sky = Lighting:FindFirstChild("g00byd0lan_Sky")
         if sky then sky:Destroy() end
     end
 end
 
 -- ============================================
--- DRAG (перетаскивание GUI)
+-- DRAG (Перетаскивание)
 -- ============================================
 local function makeDraggable(frame, dragPart)
     local dragging, dragStart, startPos = false, nil, nil
     dragPart.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-           or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = frame.Position
         end
     end)
     dragPart.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-           or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-                         or input.UserInputType == Enum.UserInputType.Touch) then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             local viewport = Camera.ViewportSize
             local frameSize = frame.AbsoluteSize
@@ -197,7 +181,7 @@ local function makeDraggable(frame, dragPart)
 end
 
 -- ============================================
--- GUI (300x300, черно-зеленый, черный текст)
+-- GUI
 -- ============================================
 local function createGUI()
     if state.mainGui then state.mainGui:Destroy() end
@@ -223,11 +207,8 @@ local function createGUI()
     local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 12); corner.Parent = mainFrame
     local stroke = Instance.new("UIStroke"); stroke.Color = CONFIG.accentColor; stroke.Thickness = 2; stroke.Transparency = 0.3; stroke.Parent = mainFrame
     
-    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = CONFIG.guiSize
-    }):Play()
+    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CONFIG.guiSize }):Play()
     
-    -- Заголовок
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 40)
     titleBar.BackgroundColor3 = CONFIG.bgColor
@@ -247,7 +228,6 @@ local function createGUI()
     titleText.TextXAlignment = Enum.TextXAlignment.Left
     titleText.Parent = titleBar
     
-    -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 24, 0, 24)
     closeBtn.Position = UDim2.new(1, -32, 0.5, -12)
@@ -262,8 +242,7 @@ local function createGUI()
     
     closeBtn.MouseButton1Click:Connect(function()
         local t = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0)
+            Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)
         })
         t:Play()
         t.Completed:Connect(function()
@@ -274,7 +253,6 @@ local function createGUI()
         state.menuOpen = false
     end)
     
-    -- Контент
     local content = Instance.new("Frame")
     content.Size = UDim2.new(1, -20, 1, -55)
     content.Position = UDim2.new(0, 10, 0, 45)
@@ -286,7 +264,6 @@ local function createGUI()
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.Parent = content
     
-    -- Кнопка sky
     local skyBtn = Instance.new("TextButton")
     skyBtn.Size = UDim2.new(1, 0, 0, 40)
     skyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -310,7 +287,6 @@ local function createGUI()
         end
     end)
     
-    -- Кнопка Effect G00BY
     local effectBtn = Instance.new("TextButton")
     effectBtn.Size = UDim2.new(1, 0, 0, 40)
     effectBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -334,15 +310,10 @@ local function createGUI()
         end
     end)
     
-    -- Перетаскивание
     makeDraggable(mainFrame, titleBar)
-    
     return state.mainGui
 end
 
--- ============================================
--- ОТКРЫТИЕ/ЗАКРЫТИЕ
--- ============================================
 local function toggleMenu()
     if not state.mainGui then
         createGUI()
@@ -353,14 +324,13 @@ local function toggleMenu()
     state.mainGui.Enabled = state.menuOpen
 end
 
--- ============================================
--- ИНИЦИАЛИЗАЦИЯ
--- ============================================
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == CONFIG.menuKey then
         toggleMenu()
     end
 end)
+
+print("[g00byd0lan GUI] Loaded. Press H to open menu.")
 
 print("[g00byd0lan GUI] Loaded. Press H to open menu.")
