@@ -1,7 +1,9 @@
 -- ============================================
--- g00byd0lan GUI - Sky & Effect
+-- g00byd0lan GUI - Sky Changer & Effect
 -- Open/Close: H
--- Texture: rbxassetid://15771263462
+-- Black & Green theme, black text
+-- Sky texture: rbxassetid://11820057637
+-- Effect texture: rbxassetid://11820057637
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -12,14 +14,15 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+-- Конфигурация
 local CONFIG = {
     menuKey = Enum.KeyCode.H,
     guiSize = UDim2.new(0, 300, 0, 300),
     bgColor = Color3.fromRGB(0, 0, 0),
     accentColor = Color3.fromRGB(0, 255, 0),
     textColor = Color3.fromRGB(0, 0, 0),
-    skyTexture = "rbxassetid://15771263462",   -- Твой ID для неба
-    effectTexture = "rbxassetid://15771263462" -- Твой ID для эффекта
+    skyTexture = "rbxassetid://11820057637",
+    effectTexture = "rbxassetid://11820057637" -- Обновленная текстура эффекта
 }
 
 local state = {
@@ -33,43 +36,56 @@ local state = {
 }
 
 -- ============================================
--- ЭФФЕКТ G00BY (Частицы)
+-- ЭФФЕКТ G00BY
 -- ============================================
 local function removeEffect()
-    for _, e in ipairs(state.effectEmitters) do
-        if e and e.Parent then e:Destroy() end
+    for _, obj in ipairs(state.effectEmitters) do
+        if obj and obj.Parent then obj:Destroy() end
     end
     state.effectEmitters = {}
 end
 
 local function createEffect(character)
     removeEffect()
-    local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+    local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
+    local att = Instance.new("Attachment")
+    att.Name = "G00byEffect_Att"
+    att.Parent = root
+
     local emitter = Instance.new("ParticleEmitter")
     emitter.Name = "G00byEffect"
     emitter.Texture = CONFIG.effectTexture
-    emitter.Rate = 100 -- Много частиц
+    emitter.Rate = 80
     emitter.Lifetime = NumberRange.new(1, 2.5)
-    emitter.Speed = NumberRange.new(2, 5)
+    emitter.Speed = NumberRange.new(1, 8)
     emitter.SpreadAngle = Vector2.new(360, 360)
+    
     emitter.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.5, 3), -- Размер частиц
+        NumberSequenceKeypoint.new(0.2, 2.5),
+        NumberSequenceKeypoint.new(0.8, 2.5),
         NumberSequenceKeypoint.new(1, 0)
     })
+    
     emitter.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(0.2, 0.2),
-        NumberSequenceKeypoint.new(0.8, 0.2),
+        NumberSequenceKeypoint.new(0.1, 0),
+        NumberSequenceKeypoint.new(0.9, 0),
         NumberSequenceKeypoint.new(1, 1)
     })
+    
+    emitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
     emitter.LightEmission = 1
+    emitter.LightInfluence = 0
     emitter.ZOffset = 1
     emitter.Acceleration = Vector3.new(0, 2, 0)
-    emitter.Parent = root
+    emitter.Rotation = NumberRange.new(0, 360)
+    emitter.RotSpeed = NumberRange.new(-150, 150)
+    emitter.Parent = att
     
+    table.insert(state.effectEmitters, att)
     table.insert(state.effectEmitters, emitter)
 end
 
@@ -269,11 +285,11 @@ local function createGUI()
         end
     end)
     
-    -- Кнопка Effect G00by
+    -- Кнопка Effect G00BY
     local effectBtn = Instance.new("TextButton")
     effectBtn.Size = UDim2.new(1, 0, 0, 40)
     effectBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    effectBtn.Text = "Effect G00by"
+    effectBtn.Text = "Effect G00BY"
     effectBtn.TextColor3 = CONFIG.textColor
     effectBtn.TextSize = 16
     effectBtn.Font = Enum.Font.GothamBold
