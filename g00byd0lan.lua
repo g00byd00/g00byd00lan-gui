@@ -1,11 +1,11 @@
 -- ============================================
--- g00byd0lan GUI - Sky Changer & Effect (FIXED 2.0)
+-- g00byd0lan GUI - 3D Sky & Effect (FINAL FIX)
 -- Open/Close: H
+-- Texture: rbxassetid://178993746
 -- ============================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -13,30 +13,70 @@ local Camera = workspace.CurrentCamera
 
 local CONFIG = {
     menuKey = Enum.KeyCode.H,
-    guiSize = UDim2.new(0, 300, 0, 300),
-    bgColor = Color3.fromRGB(0, 0, 0),
-    accentColor = Color3.fromRGB(0, 255, 0),
-    textColor = Color3.fromRGB(0, 0, 0),
     textureID = "rbxassetid://178993746"
 }
 
 local state = {
     menuOpen = false,
     mainGui = nil,
-    skyLoop = nil,
-    effectObjects = {},
-    effectConnection = nil,
-    effectOn = false
+    skyModel = nil,
+    effectParts = {},
+    updateConnection = nil
 }
 
 -- ============================================
--- ЭФФЕКТ G00BY (Картинки вокруг персонажа)
+-- 3D НЕБО (Купол вокруг карты)
+-- ============================================
+local function toggleSky(on)
+    if state.skyModel then
+        state.skyModel:Destroy()
+        state.skyModel = nil
+    end
+
+    if on then
+        state.skyModel = Instance.new("Model")
+        state.skyModel.Name = "G00by_SkyDome"
+        state.skyModel.Parent = workspace
+
+        -- Создаем огромную сферу вокруг игрока
+        local sphere = Instance.new("Part")
+        sphere.Shape = Enum.PartType.Ball
+        sphere.Size = Vector3.new(4000, 4000, 4000) -- Огромный размер
+        sphere.Material = Enum.Material.SmoothPlastic
+        sphere.Transparency = 0.1
+        sphere.CanCollide = false
+        sphere.Anchored = true
+        sphere.Parent = state.skyModel
+
+        -- Натягиваем твою картинку на эту сферу
+        local decal = Instance.new("Decal")
+        decal.Texture = CONFIG.textureID
+        decal.Face = Enum.NormalId.Front -- Картинка будет изнутри
+        decal.Parent = sphere
+
+        -- Сфера всегда будет двигаться за камерой, чтобы ты видел картинку везде
+        if state.updateConnection then state.updateConnection:Disconnect() end
+        state.updateConnection = RunService.RenderStepped:Connect(function()
+            if sphere and sphere.Parent then
+                sphere.CFrame = CFrame.new(Camera.CFrame.Position)
+            end
+        end)
+    else
+        if state.updateConnection then
+            state.updateConnection:Disconnect()
+            state.updateConnection = nil
+        end
+    end
+end
+
+-- ============================================
+-- 3D ЭФФЕКТ G00BY (Сферы вокруг персонажа)
 -- ============================================
 local function removeEffect()
-    for _, obj in ipairs(state.effectObjects) do
-        if obj and obj.Parent then obj:Destroy() end
+    for _, part in ipairs(state.effectParts) do
+        if part and part.Parent then part:Destroy() end
     end
-    state.effectObjects = {}
+    state.effectParts = {}
 end
 
 local function createEffect(character)
@@ -45,97 +85,52 @@ local function createEffect(character)
     if not root then return end
     
     local offsets = {
-        Vector3.new(0, 3, 0), Vector3.new(0, -3, 0),
+        Vector3.new(0, 3, 0), Vector3.new(0, -2, 0),
         Vector3.new(3, 0, 0), Vector3.new(-3, 0, 0),
         Vector3.new(0, 0, 3), Vector3.new(0, 0, -3)
     }
 
-    for i, offset in ipairs(offsets) do
-        -- Создаем невидимую плашку (Part)
-        local part = Instance.new("Part")
-        part.Name = "G00byEffectPart"
-        part.Size = Vector3.new(4, 4, 0.1)
-        part.Transparency = 1
-        part.Anchored = false
-        part.CanCollide = false
-        part.Massless = true
-        part.CFrame = root.CFrame * CFrame.new(offset)
-        part.Parent = character
+    for _, offset in ipairs(offsets) do
+        local sphere = Instance.new("Part")
+        sphere.Shape = Enum.PartType.Ball
+        sphere.Size = Vector3.new(4, 4, 4) -- Размер шарика эффекта
+        sphere.Material = Enum.Material.Neon -- Светящийся
+        sphere.CanCollide = false
+        sphere.Anchored = false
+        sphere.Massless = true
+        sphere.CFrame = root.CFrame * CFrame.new(offset)
+        sphere.Parent = character
         
-        -- Прикрепляем картинку (Decal) к этой плашке
+        -- Натягиваем картинку на шарик
         local decal = Instance.new("Decal")
         decal.Texture = CONFIG.textureID
         decal.Face = Enum.NormalId.Front
-        decal.Parent = part
+        decal.Parent = sphere
         
-        -- Привязываем плашку к персонажу с помощью Weld
+        -- Крепим к персонажу
         local weld = Instance.new("WeldConstraint")
         weld.Part0 = root
-        weld.Part1 = part
-        weld.Parent = part
+        weld.Part1 = sphere
+        weld.Parent = sphere
         
-        table.insert(state.effectObjects, part)
+        table.insert(state.effectParts, sphere)
     end
 end
 
 local function toggleEffect(on)
-    state.effectOn = on
     if on then
         if LocalPlayer.Character then createEffect(LocalPlayer.Character) end
-        if state.effectConnection then state.effectConnection:Disconnect() end
-        state.effectConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+        LocalPlayer.CharacterAdded:Connect(function(char)
             task.wait(1)
-            if state.effectOn then createEffect(character) end
+            if #state.effectParts > 0 then createEffect(char) end
         end)
     else
         removeEffect()
-        if state.effectConnection then
-            state.effectConnection:Disconnect()
-            state.effectConnection = nil
-        end
     end
 end
 
 -- ============================================
--- SKY (Жесткая смена неба)
--- ============================================
-local function toggleSky(on)
-    if state.skyLoop then
-        state.skyLoop:Disconnect()
-        state.skyLoop = nil
-    end
-
-    if on then
-        state.skyLoop = RunService.Heartbeat:Connect(function()
-            -- Убиваем туман и эффекты, чтобы небо было видно
-            for _, obj in ipairs(Lighting:GetChildren()) do
-                if obj:IsA("Atmosphere") or obj:IsA("Sky") then
-                    if obj.Name ~= "CustomSky" then obj:Destroy() end
-                end
-            end
-            
-            -- Создаем наше небо
-            if not Lighting:FindFirstChild("CustomSky") then
-                local sky = Instance.new("Sky")
-                sky.Name = "CustomSky"
-                -- Ставим картинку на все 6 сторон
-                sky.SkyboxBk = CONFIG.textureID
-                sky.SkyboxDn = CONFIG.textureID
-                sky.SkyboxFt = CONFIG.textureID
-                sky.SkyboxLf = CONFIG.textureID
-                sky.SkyboxRt = CONFIG.textureID
-                sky.SkyboxUp = CONFIG.textureID
-                sky.Parent = Lighting
-            end
-        end)
-    else
-        local sky = Lighting:FindFirstChild("CustomSky")
-        if sky then sky:Destroy() end
-    end
-end
-
--- ============================================
--- DRAG
+-- DRAG (Перетаскивание GUI)
 -- ============================================
 local function makeDraggable(frame, dragPart)
     local dragging, dragStart, startPos = false, nil, nil
@@ -174,21 +169,20 @@ local function createGUI()
     local mainFrame = Instance.new("Frame")
     mainFrame.Size = UDim2.new(0, 0, 0, 0)
     mainFrame.Position = UDim2.new(0.5, -150, 0.5, -150)
-    mainFrame.BackgroundColor3 = CONFIG.bgColor
+    mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     mainFrame.BackgroundTransparency = 0.1
     mainFrame.BorderSizePixel = 0
     mainFrame.ClipsDescendants = true
     mainFrame.Parent = state.mainGui
     
     local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 12); corner.Parent = mainFrame
-    local stroke = Instance.new("UIStroke"); stroke.Color = CONFIG.accentColor; stroke.Thickness = 2; stroke.Parent = mainFrame
+    local stroke = Instance.new("UIStroke"); stroke.Color = Color3.fromRGB(0, 255, 0); stroke.Thickness = 2; stroke.Parent = mainFrame
     
-    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CONFIG.guiSize }):Play()
+    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 300, 0, 300) }):Play()
     
-    -- Заголовок
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 40)
-    titleBar.BackgroundColor3 = CONFIG.bgColor
+    titleBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     titleBar.BackgroundTransparency = 0.3
     titleBar.Parent = mainFrame
     local tCorner = Instance.new("UICorner"); tCorner.CornerRadius = UDim.new(0, 12); tCorner.Parent = titleBar
@@ -198,19 +192,18 @@ local function createGUI()
     titleText.Position = UDim2.new(0, 10, 0, 0)
     titleText.BackgroundTransparency = 1
     titleText.Text = "g00byd0lan GUI"
-    titleText.TextColor3 = CONFIG.accentColor
+    titleText.TextColor3 = Color3.fromRGB(0, 255, 0)
     titleText.TextSize = 16
     titleText.Font = Enum.Font.GothamBold
     titleText.TextXAlignment = Enum.TextXAlignment.Left
     titleText.Parent = titleBar
     
-    -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 24, 0, 24)
     closeBtn.Position = UDim2.new(1, -32, 0.5, -12)
     closeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     closeBtn.Text = "✕"
-    closeBtn.TextColor3 = CONFIG.accentColor
+    closeBtn.TextColor3 = Color3.fromRGB(0, 255, 0)
     closeBtn.TextSize = 12
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.BorderSizePixel = 0
@@ -222,7 +215,7 @@ local function createGUI()
         t:Play()
         t.Completed:Connect(function()
             state.mainGui.Enabled = false
-            mainFrame.Size = CONFIG.guiSize
+            mainFrame.Size = UDim2.new(0, 300, 0, 300)
             mainFrame.Position = UDim2.new(0.5, -150, 0.5, -150)
         end)
         state.menuOpen = false
@@ -239,41 +232,37 @@ local function createGUI()
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.Parent = content
     
-    -- Кнопка Sky
     local skyBtn = Instance.new("TextButton")
     skyBtn.Size = UDim2.new(1, 0, 0, 40)
     skyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     skyBtn.Text = "sky"
-    skyBtn.TextColor3 = CONFIG.textColor
+    skyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
     skyBtn.TextSize = 16
     skyBtn.Font = Enum.Font.GothamBold
-    skyBtn.BorderSizePixel = 0
     skyBtn.Parent = content
     local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(0, 8); sc.Parent = skyBtn
     
     local skyActive = false
     skyBtn.MouseButton1Click:Connect(function()
         skyActive = not skyActive
-        skyBtn.BackgroundColor3 = skyActive and CONFIG.accentColor or Color3.fromRGB(50, 50, 50)
+        skyBtn.BackgroundColor3 = skyActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(50, 50, 50)
         toggleSky(skyActive)
     end)
     
-    -- Кнопка Effect
     local effectBtn = Instance.new("TextButton")
     effectBtn.Size = UDim2.new(1, 0, 0, 40)
     effectBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     effectBtn.Text = "Effect G00BY"
-    effectBtn.TextColor3 = CONFIG.textColor
+    effectBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
     effectBtn.TextSize = 16
     effectBtn.Font = Enum.Font.GothamBold
-    effectBtn.BorderSizePixel = 0
     effectBtn.Parent = content
     local ec = Instance.new("UICorner"); ec.CornerRadius = UDim.new(0, 8); ec.Parent = effectBtn
     
     local effectActive = false
     effectBtn.MouseButton1Click:Connect(function()
         effectActive = not effectActive
-        effectBtn.BackgroundColor3 = effectActive and CONFIG.accentColor or Color3.fromRGB(50, 50, 50)
+        effectBtn.BackgroundColor3 = effectActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(50, 50, 50)
         toggleEffect(effectActive)
     end)
     
@@ -298,4 +287,4 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
-print("[g00byd0lan GUI] Loaded. Press H to open menu.")
+print("[g00byd0lan GUI] Loaded.")
