@@ -1,8 +1,8 @@
 -- ============================================
--- g00byd0lan GUI - Sky Changer & Effect (FIXED)
+-- g00byd0lan GUI - Sky Changer & Effect
 -- Open/Close: H
 -- Black & Green theme, black text
--- Texture: rbxassetid://8408806744
+-- Texture: rbxassetid://178993746
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -20,7 +20,7 @@ local CONFIG = {
     bgColor = Color3.fromRGB(0, 0, 0),
     accentColor = Color3.fromRGB(0, 255, 0),
     textColor = Color3.fromRGB(0, 0, 0),
-    textureID = "rbxassetid://8408806744"
+    textureID = "rbxassetid://178993746" -- Новая текстура
 }
 
 local state = {
@@ -48,7 +48,7 @@ local function createEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- 6 точек вокруг персонажа для полного окружения
+    -- 7 точек вокруг персонажа для полного окружения
     local offsets = {
         Vector3.new(0, 0, 0),    -- Центр
         Vector3.new(3, 0, 0),    -- Право
@@ -68,22 +68,22 @@ local function createEffect(character)
         local emitter = Instance.new("ParticleEmitter")
         emitter.Name = "G00byEffect"
         emitter.Texture = CONFIG.textureID
-        emitter.Rate = 20
+        emitter.Rate = 25
         emitter.Lifetime = NumberRange.new(1.5, 3)
         emitter.Speed = NumberRange.new(1, 4)
         emitter.SpreadAngle = Vector2.new(360, 360)
         
         emitter.Size = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.2, 3.5),
-            NumberSequenceKeypoint.new(0.8, 3.5),
+            NumberSequenceKeypoint.new(0.2, 4),
+            NumberSequenceKeypoint.new(0.8, 4),
             NumberSequenceKeypoint.new(1, 0)
         })
         
         emitter.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.1, 0.3),
-            NumberSequenceKeypoint.new(0.9, 0.3),
+            NumberSequenceKeypoint.new(0.1, 0.2),
+            NumberSequenceKeypoint.new(0.9, 0.2),
             NumberSequenceKeypoint.new(1, 1)
         })
         
