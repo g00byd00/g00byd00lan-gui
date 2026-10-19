@@ -1,5 +1,5 @@
 -- ============================================
--- g00byd0lan GUI - 3D Sky & Effect (FINAL FIX)
+-- g00byd0lan GUI - TEXTURE VERSION (100% WORK)
 -- Open/Close: H
 -- Texture: rbxassetid://178993746
 -- ============================================
@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -20,57 +21,71 @@ local state = {
     menuOpen = false,
     mainGui = nil,
     skyModel = nil,
+    skyConnection = nil,
     effectParts = {},
-    updateConnection = nil
+    effectConnection = nil
 }
 
 -- ============================================
--- 3D НЕБО (Купол вокруг карты)
+-- НЕБО С КАРТИНКОЙ (Купол вокруг игрока)
 -- ============================================
 local function toggleSky(on)
-    if state.skyModel then
-        state.skyModel:Destroy()
-        state.skyModel = nil
-    end
-
+    -- Удаляем старое
+    if state.skyModel then state.skyModel:Destroy() end
+    if state.skyConnection then state.skyConnection:Disconnect() end
+    
+    -- Восстанавливаем стандартное небо, если выключили
+    local oldSky = Lighting:FindFirstChild("g00by_OldSky")
+    if oldSky then oldSky.Parent = Lighting end
+    
     if on then
+        -- Прячем стандартное небо игры, чтобы оно не перекрывало облака
+        for _, obj in ipairs(Lighting:GetChildren()) do
+            if obj:IsA("Sky") then
+                obj.Name = "g00by_OldSky"
+                obj.Parent = nil
+            end
+        end
+        
         state.skyModel = Instance.new("Model")
         state.skyModel.Name = "G00by_SkyDome"
         state.skyModel.Parent = workspace
 
-        -- Создаем огромную сферу вокруг игрока
+        -- Огромная сфера, которая будет нашим небом
         local sphere = Instance.new("Part")
         sphere.Shape = Enum.PartType.Ball
-        sphere.Size = Vector3.new(4000, 4000, 4000) -- Огромный размер
+        sphere.Size = Vector3.new(2000, 2000, 2000) 
         sphere.Material = Enum.Material.SmoothPlastic
-        sphere.Transparency = 0.1
+        sphere.Transparency = 0 -- Непрозрачная
         sphere.CanCollide = false
         sphere.Anchored = true
         sphere.Parent = state.skyModel
 
-        -- Натягиваем твою картинку на эту сферу
-        local decal = Instance.new("Decal")
-        decal.Texture = CONFIG.textureID
-        decal.Face = Enum.NormalId.Front -- Картинка будет изнутри
-        decal.Parent = sphere
+        -- Натягиваем ТЕКСТУРУ (она покрывает шар полностью)
+        local texture = Instance.new("Texture")
+        texture.Texture = CONFIG.textureID
+        -- Настраиваем текстуру, чтобы она покрывала сферу со всех сторон
+        texture.Face = Enum.NormalId.Back 
+        texture.StudsPerTileU = 500 
+        texture.StudsPerTileV = 500
+        texture.Parent = sphere
 
-        -- Сфера всегда будет двигаться за камерой, чтобы ты видел картинку везде
-        if state.updateConnection then state.updateConnection:Disconnect() end
-        state.updateConnection = RunService.RenderStepped:Connect(function()
+        -- Купол летает за камерой, чтобы ты всегда видел облака
+        state.skyConnection = RunService.RenderStepped:Connect(function()
             if sphere and sphere.Parent then
                 sphere.CFrame = CFrame.new(Camera.CFrame.Position)
             end
         end)
     else
-        if state.updateConnection then
-            state.updateConnection:Disconnect()
-            state.updateConnection = nil
+        if state.skyModel then
+            state.skyModel:Destroy()
+            state.skyModel = nil
         end
     end
 end
 
 -- ============================================
--- 3D ЭФФЕКТ G00BY (Сферы вокруг персонажа)
+-- ЭФФЕКТ G00BY НА ПЕРСОНАЖЕ
 -- ============================================
 local function removeEffect()
     for _, part in ipairs(state.effectParts) do
@@ -84,28 +99,34 @@ local function createEffect(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
+    -- Точки вокруг персонажа
     local offsets = {
-        Vector3.new(0, 3, 0), Vector3.new(0, -2, 0),
-        Vector3.new(3, 0, 0), Vector3.new(-3, 0, 0),
-        Vector3.new(0, 0, 3), Vector3.new(0, 0, -3)
+        Vector3.new(0, 3, 0),    -- Сверху
+        Vector3.new(0, -2, 0),   -- Снизу
+        Vector3.new(2.5, 0, 0),  -- Справа
+        Vector3.new(-2.5, 0, 0), -- Слева
+        Vector3.new(0, 0, 2.5),  -- Спереди
+        Vector3.new(0, 0, -2.5)  -- Сзади
     }
 
     for _, offset in ipairs(offsets) do
         local sphere = Instance.new("Part")
         sphere.Shape = Enum.PartType.Ball
-        sphere.Size = Vector3.new(4, 4, 4) -- Размер шарика эффекта
-        sphere.Material = Enum.Material.Neon -- Светящийся
+        sphere.Size = Vector3.new(3, 3, 3)
+        sphere.Material = Enum.Material.SmoothPlastic
         sphere.CanCollide = false
-        sphere.Anchored = false
         sphere.Massless = true
+        sphere.Anchored = false
         sphere.CFrame = root.CFrame * CFrame.new(offset)
         sphere.Parent = character
         
-        -- Натягиваем картинку на шарик
-        local decal = Instance.new("Decal")
-        decal.Texture = CONFIG.textureID
-        decal.Face = Enum.NormalId.Front
-        decal.Parent = sphere
+        -- Используем Texture вместо Decal (оборачивает шар со всех сторон)
+        local texture = Instance.new("Texture")
+        texture.Texture = CONFIG.textureID
+        texture.Face = Enum.NormalId.Back
+        texture.StudsPerTileU = 3
+        texture.StudsPerTileV = 3
+        texture.Parent = sphere
         
         -- Крепим к персонажу
         local weld = Instance.new("WeldConstraint")
@@ -120,17 +141,22 @@ end
 local function toggleEffect(on)
     if on then
         if LocalPlayer.Character then createEffect(LocalPlayer.Character) end
-        LocalPlayer.CharacterAdded:Connect(function(char)
+        if state.effectConnection then state.effectConnection:Disconnect() end
+        state.effectConnection = LocalPlayer.CharacterAdded:Connect(function(char)
             task.wait(1)
             if #state.effectParts > 0 then createEffect(char) end
         end)
     else
         removeEffect()
+        if state.effectConnection then
+            state.effectConnection:Disconnect()
+            state.effectConnection = nil
+        end
     end
 end
 
 -- ============================================
--- DRAG (Перетаскивание GUI)
+-- GUI И ПЕРЕТАСКИВАНИЕ
 -- ============================================
 local function makeDraggable(frame, dragPart)
     local dragging, dragStart, startPos = false, nil, nil
@@ -154,9 +180,6 @@ local function makeDraggable(frame, dragPart)
     end)
 end
 
--- ============================================
--- GUI
--- ============================================
 local function createGUI()
     if state.mainGui then state.mainGui:Destroy() end
     
