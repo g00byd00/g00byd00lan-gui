@@ -1,7 +1,6 @@
 -- ============================================
--- g00byd0lan GUI - CUBE SKY & EFFECT (FINAL)
--- Open/Close: H
--- Texture: rbxassetid://94223128682740
+-- g00byd0lan GUI - FINAL FIX (Decal 6 Walls)
+-- Texture: rbxassetid://15771263462
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -14,68 +13,95 @@ local Camera = workspace.CurrentCamera
 
 local CONFIG = {
     menuKey = Enum.KeyCode.H,
-    textureID = "rbxassetid://94223128682740" -- Твой новый ID
+    textureID = "rbxassetid://15771263462" -- Твой новый ID
 }
 
 local state = {
     menuOpen = false,
     mainGui = nil,
-    skyPart = nil,
+    skyModel = nil,
     skyConnection = nil,
     effectParts = {},
     effectConnection = nil
 }
 
 -- ============================================
--- SKY (Куб с текстурой вместо неба)
+-- SKY (Небо из 6 плит с картинкой)
 -- ============================================
 local function toggleSky(on)
-    if state.skyPart then state.skyPart:Destroy() end
+    if state.skyModel then state.skyModel:Destroy() end
     if state.skyConnection then state.skyConnection:Disconnect() end
     
     if on then
-        -- Отключаем атмосферу и стандартное небо игры
+        -- Отключаем стандартное небо и туман
         for _, obj in ipairs(Lighting:GetChildren()) do
             if obj:IsA("Sky") then obj.Parent = nil end
             if obj:IsA("Atmosphere") then obj.Density = 0 end
         end
         
-        -- Создаем куб вместо неба
-        local cube = Instance.new("Part")
-        cube.Name = "G00by_SkyBox"
-        cube.Size = Vector3.new(2000, 2000, 2000)
-        cube.Material = Enum.Material.SmoothPlastic
-        cube.Transparency = 0
-        cube.Anchored = true
-        cube.CanCollide = false
-        cube.CastShadow = false
-        cube.Parent = workspace
-        state.skyPart = cube
+        local model = Instance.new("Model")
+        model.Name = "G00by_SkyModel"
+        model.Parent = workspace
+        state.skyModel = model
 
-        -- Натягиваем текстуру (Texture работает на кубах идеально)
-        local texture = Instance.new("Texture")
-        texture.Texture = CONFIG.textureID
-        texture.Face = Enum.NormalId.Back -- Задняя сторона куба, чтобы мы видели картинку изнутри
-        texture.StudsPerTileU = 50 
-        texture.StudsPerTileV = 50
-        texture.Parent = cube
+        local size = 2000
+        local thickness = 50
 
-        -- Куб летает за камерой
+        -- Функция создания одной стены неба
+        local function createWall(posOffset, lookAt, isUp)
+            local part = Instance.new("Part")
+            part.Size = Vector3.new(size, size, thickness)
+            part.Anchored = true
+            part.CanCollide = false
+            part.Transparency = 0
+            part.CastShadow = false
+            part.Material = Enum.Material.SmoothPlastic
+            part.Parent = model
+            
+            local decal = Instance.new("Decal")
+            decal.Texture = CONFIG.textureID
+            decal.Face = Enum.NormalId.Front
+            decal.Parent = part
+            
+            -- Возвращаем часть для обновления позиции
+            return {Part = part, Offset = posOffset, LookAt = lookAt, IsUp = isUp}
+        end
+
+        -- Создаем 6 стен (Спереди, Сзади, Слева, Справа, Сверху, Снизу)
+        local walls = {
+            createWall(Vector3.new(0, 0, -size/2), true, false), -- Перед
+            createWall(Vector3.new(0, 0, size/2), true, false),  -- Зад
+            createWall(Vector3.new(-size/2, 0, 0), true, false), -- Лево
+            createWall(Vector3.new(size/2, 0, 0), true, false),  -- Право
+            createWall(Vector3.new(0, size/2, 0), false, true),  -- Верх
+            createWall(Vector3.new(0, -size/2, 0), false, true)  -- Низ
+        }
+
+        -- Двигаем небо за камерой
         state.skyConnection = RunService.RenderStepped:Connect(function()
-            if cube and cube.Parent then
-                cube.CFrame = CFrame.new(Camera.CFrame.Position)
+            if not state.skyModel then return end
+            local camPos = Camera.CFrame.Position
+            local camLook = Camera.CFrame.LookVector
+            local camRight = Camera.CFrame.RightVector
+            local camUp = Camera.CFrame.UpVector
+
+            for _, w in ipairs(walls) do
+                local pos = camPos + (camRight * w.Offset.X) + (camUp * w.Offset.Y) + (camLook * w.Offset.Z)
+                if w.IsUp then
+                    w.Part.CFrame = CFrame.new(pos, pos + (w.Offset.Y > 0 and -camUp or camUp))
+                else
+                    -- Стены смотрят в центр
+                    w.Part.CFrame = CFrame.lookAt(pos, camPos)
+                end
             end
         end)
     else
-        if state.skyPart then
-            state.skyPart:Destroy()
-            state.skyPart = nil
-        end
+        if state.skyModel then state.skyModel:Destroy() state.skyModel = nil end
     end
 end
 
 -- ============================================
--- ЭФФЕКТ G00BY (Кубы вокруг персонажа)
+-- ЭФФЕКТ G00BY (Плоские картинки вокруг персонажа)
 -- ============================================
 local function removeEffect()
     for _, part in ipairs(state.effectParts) do
@@ -96,10 +122,9 @@ local function createEffect(character)
     }
 
     for _, offset in ipairs(offsets) do
-        -- Используем Block (куб), чтобы текстура ложилась ровно
         local block = Instance.new("Part")
         block.Shape = Enum.PartType.Block
-        block.Size = Vector3.new(3, 3, 0.2) 
+        block.Size = Vector3.new(4, 4, 0.1) -- Плоская плитка
         block.Material = Enum.Material.SmoothPlastic
         block.CanCollide = false
         block.Massless = true
@@ -107,12 +132,10 @@ local function createEffect(character)
         block.CFrame = root.CFrame * CFrame.new(offset)
         block.Parent = character
         
-        local texture = Instance.new("Texture")
-        texture.Texture = CONFIG.textureID
-        texture.Face = Enum.NormalId.Front
-        texture.StudsPerTileU = 3
-        texture.StudsPerTileV = 3
-        texture.Parent = block
+        local decal = Instance.new("Decal")
+        decal.Texture = CONFIG.textureID
+        decal.Face = Enum.NormalId.Front
+        decal.Parent = block
         
         local weld = Instance.new("WeldConstraint")
         weld.Part0 = root
@@ -133,10 +156,6 @@ local function toggleEffect(on)
         end)
     else
         removeEffect()
-        if state.effectConnection then
-            state.effectConnection:Disconnect()
-            state.effectConnection = nil
-        end
     end
 end
 
@@ -295,4 +314,5 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+print("[g00byd0lan GUI] Loaded. Texture: " .. CONFIG.textureID)
 print("[g00byd0lan GUI] Loaded.")
