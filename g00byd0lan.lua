@@ -2,8 +2,8 @@
 -- g00byd0lan GUI - Sky Changer & Effect
 -- Open/Close: H
 -- Black & Green theme, black text
--- Sky texture: rbxassetid://8408806744
--- Effect texture: rbxassetid://8408806744
+-- Sky texture: rbxassetid://8408806744 (All 6 sides)
+-- Effect texture: rbxassetid://8408806744 (On Character)
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -21,8 +21,7 @@ local CONFIG = {
     bgColor = Color3.fromRGB(0, 0, 0),
     accentColor = Color3.fromRGB(0, 255, 0),
     textColor = Color3.fromRGB(0, 0, 0),
-    skyTexture = "rbxassetid://8408806744", -- Новая текстура неба
-    effectTexture = "rbxassetid://8408806744" -- Новая текстура эффекта
+    textureID = "rbxassetid://8408806744"
 }
 
 local state = {
@@ -36,7 +35,7 @@ local state = {
 }
 
 -- ============================================
--- ЭФФЕКТ G00BY
+-- ЭФФЕКТ G00BY (На персонаже)
 -- ============================================
 local function removeEffect()
     for _, obj in ipairs(state.effectEmitters) do
@@ -56,7 +55,7 @@ local function createEffect(character)
 
     local emitter = Instance.new("ParticleEmitter")
     emitter.Name = "G00byEffect"
-    emitter.Texture = CONFIG.effectTexture
+    emitter.Texture = CONFIG.textureID -- Применяем текстуру
     emitter.Rate = 80
     emitter.Lifetime = NumberRange.new(1, 2.5)
     emitter.Speed = NumberRange.new(1, 8)
@@ -109,32 +108,29 @@ local function toggleEffect(on)
 end
 
 -- ============================================
--- ЗАМЕНА НЕБА (Sky)
+-- ЗАМЕНА НЕБА (Sky на все 6 сторон)
 -- ============================================
 local function toggleSky(on)
-    local oldSky = Lighting:FindFirstChild("g00byd0lan_Sky")
-    if oldSky then oldSky:Destroy() end
+    -- Удаляем старые небеса, чтобы игра не перекрывала наше
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj:IsA("Sky") then
+            obj:Destroy()
+        end
+    end
 
     if on then
-        if not state.originalSky then
-            state.originalSky = Lighting:FindFirstChildOfClass("Sky")
-            if state.originalSky then state.originalSky.Parent = nil end
-        end
         local sky = Instance.new("Sky")
         sky.Name = "g00byd0lan_Sky"
-        sky.SkyboxBk = CONFIG.skyTexture
-        sky.SkyboxDn = CONFIG.skyTexture
-        sky.SkyboxFt = CONFIG.skyTexture
-        sky.SkyboxLf = CONFIG.skyTexture
-        sky.SkyboxRt = CONFIG.skyTexture
-        sky.SkyboxUp = CONFIG.skyTexture
+        -- Применяем текстуру на ВСЕ 6 СТОРОН
+        sky.SkyboxBk = CONFIG.textureID -- Задняя
+        sky.SkyboxDn = CONFIG.textureID -- Нижняя
+        sky.SkyboxFt = CONFIG.textureID -- Передняя
+        sky.SkyboxLf = CONFIG.textureID -- Левая
+        sky.SkyboxRt = CONFIG.textureID -- Правая
+        sky.SkyboxUp = CONFIG.textureID -- Верхняя
         sky.Parent = Lighting
         state.skyOn = true
     else
-        if state.originalSky then
-            state.originalSky.Parent = Lighting
-            state.originalSky = nil
-        end
         state.skyOn = false
     end
 end
