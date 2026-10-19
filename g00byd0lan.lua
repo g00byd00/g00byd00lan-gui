@@ -2,8 +2,8 @@
 -- g00byd0lan GUI - Sky Changer & Effect
 -- Open/Close: H
 -- Black & Green theme, black text
--- Sky texture: rbxassetid://11820057637
--- Effect texture: rbxassetid://11820057637
+-- Sky texture: rbxassetid://8408806744
+-- Effect texture: rbxassetid://8408806744
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -21,8 +21,8 @@ local CONFIG = {
     bgColor = Color3.fromRGB(0, 0, 0),
     accentColor = Color3.fromRGB(0, 255, 0),
     textColor = Color3.fromRGB(0, 0, 0),
-    skyTexture = "rbxassetid://11820057637",
-    effectTexture = "rbxassetid://11820057637" -- Обновленная текстура эффекта
+    skyTexture = "rbxassetid://8408806744", -- Новая текстура неба
+    effectTexture = "rbxassetid://8408806744" -- Новая текстура эффекта
 }
 
 local state = {
